@@ -168,7 +168,7 @@ def fix_literals(s: str) -> str:
             chunk = re.sub(r"\bTrue\b", "true", chunk)
             chunk = re.sub(r"\bFalse\b", "false", chunk)
             chunk = re.sub(r"\b(None|undefined)\b", "null", chunk)
-            chunk = re.sub(r"\b(NaN|-?Infinity)\b", "null", chunk)
+            chunk = re.sub(r"-?\b(NaN|Infinity)\b", "null", chunk)
         parts.append(chunk)
     return "".join(parts)
 
@@ -180,7 +180,7 @@ def fix_case_literals(s: str) -> str:
             chunk = re.sub(r"(?i)\b(True)\b", "true", chunk)
             chunk = re.sub(r"(?i)\b(False)\b", "false", chunk)
             chunk = re.sub(r"(?i)\b(None|undefined|nil|null)\b", "null", chunk)
-            chunk = re.sub(r"(?i)\b(NaN|-?Infinity)\b", "null", chunk)
+            chunk = re.sub(r"(?i)-?\b(NaN|Infinity)\b", "null", chunk)
         parts.append(chunk)
     return "".join(parts)
 
@@ -313,6 +313,13 @@ def loads(s: str) -> object:
     return repair(s)[0]
 
 
+def _strict_loads(s: str) -> object:
+    """json.loads that rejects NaN/Infinity (Python accepts them by default)."""
+    def _reject(c):
+        raise json.JSONDecodeError(f"Non-standard constant: {c}", s, 0)
+    return json.loads(s, parse_constant=_reject)
+
+
 def repair(text: str) -> tuple[object, list[str]]:
     """Return (parsed, applied_stages). Raises json.JSONDecodeError if unrecoverable."""
     applied: list[str] = []
@@ -321,7 +328,7 @@ def repair(text: str) -> tuple[object, list[str]]:
         text = text[1:]
         
     try:
-        return json.loads(text), applied
+        return _strict_loads(text), applied
     except json.JSONDecodeError:
         pass
         
@@ -329,7 +336,7 @@ def repair(text: str) -> tuple[object, list[str]]:
     candidate = extract_span(strip_fences(candidate))
     
     try:
-        return json.loads(candidate), applied
+        return _strict_loads(candidate), applied
     except json.JSONDecodeError:
         pass
 
@@ -339,11 +346,12 @@ def repair(text: str) -> tuple[object, list[str]]:
             candidate = next_cand
             applied.append(label)
             try:
-                return json.loads(candidate), applied
+                return _strict_loads(candidate), applied
             except json.JSONDecodeError:
                 continue
     
-    return json.loads(candidate), applied
+    return _strict_loads(candidate), applied
+
 
 
 def main() -> int:
