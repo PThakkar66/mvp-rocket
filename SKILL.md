@@ -1,180 +1,153 @@
 ---
 name: mvp-rocket
-description: A toolset for handling messy JSON from LLMs and APIs. Repairs malformed JSON payloads and infers Zod, Pydantic, JSON Schema, or TypeScript type definitions from sample data. Use when you receive broken JSON, need to generate validation schemas, or want to speed up MVP data pipeline setup.
+description: >
+  MVP acceleration toolkit with two capabilities: (1) JSON repair and schema
+  inference — repair broken JSON from LLMs, APIs, and scraped data, then generate
+  strict type definitions in Zod, Pydantic, JSON Schema, or TypeScript.
+  (2) Release auditing — scan an MVP codebase for release blockers and produce a
+  structured GO, CONDITIONAL GO, or NO-GO recommendation covering functional
+  testing, performance measurement, security review, accessibility, cross-browser
+  checks, reliability, usability, code review, and automated checks. Use when the
+  user asks to repair JSON, generate schemas/types from JSON, audit an MVP, test
+  before launch, check launch readiness, find performance problems, test user
+  journeys, make the app faster, perform QA, check production readiness, run
+  regression tests, diagnose slowness, find and fix bugs, stress-test, or check
+  Core Web Vitals and API response times.
 ---
 
-# MVP Rocket: JSON Repair & Schema Inference
+# MVP Rocket
 
-## Overview
+Two-part MVP acceleration toolkit:
 
-MVP Rocket provides two complementary utilities that form a pipeline for handling real-world JSON:
-
-1. **`repair_json.py`** — Extracts and repairs malformed JSON from messy text (LLM output, scraped pages, logs)
-2. **`json_to_schema.py`** — Infers strict validation schemas from JSON samples (Zod, Pydantic, JSON Schema, TypeScript)
-
-## Quick Start: The Pipeline
-
-The most powerful pattern is piping repair into schema generation:
-
-```bash
-# LLM spits out broken JSON → repair it → generate a Zod schema
-cat llm_output.txt | python scripts/repair_json.py - --compact | python scripts/json_to_schema.py - --name Response
-
-# Repair an API response, then generate Pydantic models
-python scripts/repair_json.py api_dump.txt -o clean.json
-python scripts/json_to_schema.py clean.json --lang pydantic --name User
-```
+1. **JSON Repair & Schema Inference** — from messy LLM output to strict types
+2. **Release Auditor** — from codebase to defensible launch recommendation
 
 ---
 
-## Capability 1: Repairing JSON (`repair_json.py`)
+## Part 1: JSON Repair & Schema Inference
 
-Heuristically repairs common JSON failure modes **outside string literals**.
+### repair_json.py
 
-### What It Fixes
-
-| Category | Examples |
-|----------|----------|
-| Markdown code fences | ` ```json ... ``` ` and surrounding prose |
-| Smart quotes | `"curly"` → `"straight"` |
-| Comments | `//` line and `/* block */` comments |
-| Single-quoted strings | `'hello'` → `"hello"` |
-| Unquoted object keys | `{name: "val"}` → `{"name": "val"}` |
-| Python/JS literals | `True`/`False`/`None`/`undefined`/`NaN`/`Infinity`/`nil` (case-insensitive) |
-| Trailing commas | `{"a": 1,}` and multiple commas `{"a": 1,,}` |
-| Truncated output | Unclosed strings, objects, arrays auto-closed |
-| Unescaped newlines | Literal `\n`/`\t`/`\r` inside strings |
-| Hex/octal numbers | `0xFF` → `255`, `0o77` → `63` |
-| Non-standard floats | `.5` → `0.5`, `5.` → `5.0`, `+5` → `5` |
-| Missing commas | `"a" "b"` → `"a", "b"` |
-| Python tuples | `(1, 2, 3)` → `[1, 2, 3]` |
-| UTF-8 BOM | Stripped automatically |
-
-### CLI Usage
+Extracts and repairs malformed JSON from messy text (LLM output, scraped pages, logs).
 
 ```bash
-python scripts/repair_json.py raw.txt                       # repair → stdout (2-space indent)
-python scripts/repair_json.py raw.txt --compact              # minified output
-python scripts/repair_json.py raw.txt --indent 4             # 4-space indent
-python scripts/repair_json.py raw.txt -o clean.json          # write to file
-python scripts/repair_json.py raw.txt -i                     # repair in place
-python scripts/repair_json.py raw.txt --check                # exit 0=valid, 1=needed repair
-python scripts/repair_json.py raw.txt --quiet                # suppress stderr diagnostics
-python scripts/repair_json.py raw.txt -e latin-1             # specify input encoding
-cat raw.txt | python scripts/repair_json.py -                # stdin
-python scripts/repair_json.py raw.txt --quiet --compact      # silent + compact (for pipelines)
-```
+# Repair broken JSON
+echo "{name: 'test', active: True, count: 0xFF}" | python scripts/repair_json.py -
 
-### CLI Flags
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `input` | *(required)* | Path to file, or `-` for stdin |
-| `-o`, `--output` | stdout | Write output to file |
-| `-e`, `--encoding` | `utf-8-sig` | Input file encoding |
-| `--indent` | `2` | Indentation level (0 = compact) |
-| `--compact` | off | Minified output (same as `--indent 0`) |
-| `--check` | off | Validation mode — no output, exit code only |
-| `-i`, `--in-place` | off | Overwrite input file with repaired output |
-| `--quiet` | off | Suppress stderr diagnostics |
-
-### Library API
-
-```python
+# Library API
 import repair_json
-
-# Quick parse — returns parsed object or raises JSONDecodeError
 data = repair_json.loads(messy_text)
-
-# Detailed — returns (parsed_object, list_of_applied_stages)
-data, stages = repair_json.repair(messy_text)
 ```
 
----
+**Fixes**: markdown fences, smart quotes, single quotes, comments, unquoted keys,
+Python/JS literals, trailing commas, truncated output, hex/octal numbers,
+non-standard floats, Python tuples, missing commas, BOM.
 
-## Capability 2: Inferring Schemas (`json_to_schema.py`)
+**CLI flags**: `--output`, `--encoding`, `--indent`, `--compact`, `--check`, `--in-place`, `--quiet`
 
-Analyzes sample JSON and generates strict type definitions.
+### json_to_schema.py
 
-### Output Targets
-
-| `--lang` | Output | Use Case |
-|----------|--------|----------|
-| `zod` *(default)* | Zod schema + TypeScript type | TypeScript/Node.js validation |
-| `pydantic` | Pydantic v2 BaseModel classes | Python API validation |
-| `jsonschema` | JSON Schema (Draft 2020-12) | OpenAPI docs, cross-language |
-| `typescript` | Raw TypeScript `interface`/`type` | TS projects without Zod dependency |
-
-### Features
-
-- **Format detection**: UUID, email, URL, ISO date, ISO datetime
-- **Enum inference**: Low-cardinality string fields auto-detected as `z.enum()` / `Literal[...]` (threshold: 10 by default)
-- **Nullable handling**: `null + Type` → `.nullable()` / `Type | None`
-- **Union types**: Heterogeneous values → `z.union([...])` / `X | Y`
-- **Multi-sample merging**: Feed multiple records to discover optional fields
-- **Loose mode**: `.passthrough()` / `extra="allow"` / `additionalProperties`
-- **Recursion safety**: Depth-limited to 50 levels
-
-### CLI Usage
+Infers strict validation schemas from JSON samples.
 
 ```bash
 # Generate Zod schema
 python scripts/json_to_schema.py sample.json --name User
 
-# Generate Pydantic models
-python scripts/json_to_schema.py sample.json --lang pydantic --name User
-
-# Generate JSON Schema
-python scripts/json_to_schema.py sample.json --lang jsonschema --name User
-
-# Generate TypeScript interfaces
-python scripts/json_to_schema.py sample.json --lang typescript --name User
-
-# Model array items (infer element schema from array of records)
-python scripts/json_to_schema.py records.json --root-array-item --name Record
-
-# Merge multiple sample files into one schema
-python scripts/json_to_schema.py sample1.json sample2.json --merge --name Response
-
-# Disable format detection
-python scripts/json_to_schema.py data.json --no-formats
-
-# Control enum detection threshold
-python scripts/json_to_schema.py data.json --root-array-item --enums 5
-
-# Cap array sampling for large files
-python scripts/json_to_schema.py huge.json --max-array-samples 100
-
-# Write to file
-python scripts/json_to_schema.py sample.json -o schema.ts
-
-# Loose mode (allow unknown keys)
-python scripts/json_to_schema.py sample.json --loose
-
-# stdin
-cat payload.json | python scripts/json_to_schema.py - --name Payload
+# Generate Pydantic model
+python scripts/json_to_schema.py sample.json --name User --lang pydantic
 ```
 
-### CLI Flags
+**Output targets**: `zod` (default), `pydantic`, `jsonschema`, `typescript`
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `inputs` | *(required)* | One or more JSON file paths, or `-` for stdin |
-| `--lang` | `zod` | Output target: `zod`, `pydantic`, `jsonschema`, `typescript` |
-| `--name` | `Root` | Root schema/model name |
-| `--root-array-item` | off | Model the array item, not the array itself |
-| `--no-formats` | off | Skip string format detection |
-| `--loose` | off | Allow unknown keys in output schema |
-| `-o`, `--output` | stdout | Write output to file |
-| `--enums` | `10` | Max unique values to detect as enum (0 = disabled) |
-| `--max-array-samples` | all | Cap array elements sampled |
-| `--merge` | off | Required when passing multiple input files |
+**Features**: format detection (UUID, email, URL, date, datetime), enum inference,
+nullable/union handling, multi-sample merging, loose mode.
 
-> **Naming note**: `--name` is used as the root identifier. For Zod, `Schema` is automatically appended (e.g., `--name User` → `UserSchema`). Don't pass `--name UserSchema` or you'll get `UserSchemaSchema`.
+**CLI flags**: `--lang`, `--name`, `--root-array-item`, `--no-formats`, `--loose`,
+`--output`, `--enums`, `--max-array-samples`, `--merge`
+
+### Pipeline
+
+```bash
+cat llm_output.txt | python scripts/repair_json.py - --compact \
+  | python scripts/json_to_schema.py - --name Response
+```
 
 ---
 
-## Resources
+## Part 2: Release Auditor
 
-- `scripts/repair_json.py`: JSON repair utility (CLI + library)
-- `scripts/json_to_schema.py`: Schema inference utility
+Scans an MVP codebase end to end and produces a release readiness report.
+
+### Operating Modes
+
+| Mode | When | Behavior |
+|------|------|----------|
+| `audit-only` | Default | Inspect and test. Do not change application code. |
+| `audit-and-fix` | User explicitly requests fixes | Diagnose, fix, measure before/after, retest. |
+| `verify-fixes` | Re-checking previous issues | Retest specific issues + regression check. |
+
+### Safety Boundaries
+
+- Prefer local/staging/test environments
+- Treat production as read-only unless explicitly authorized
+- Never run destructive tests without explicit authorization
+- Redact all secrets and personal data from reports
+- Preserve uncommitted code changes
+
+### Audit Workflow
+
+1. **Discovery** — detect product type, stack, critical user journeys
+2. **Test Plan** — risk-based test matrix prioritized by severity
+3. **Execute** — functional, visual, cross-browser, performance, security, accessibility, reliability, usability, code review, automated checks
+4. **Fix** (audit-and-fix only) — reproduce, baseline, fix, measure, compare
+5. **Report** — structured report with GO/CONDITIONAL GO/NO-GO verdict
+
+### Audit Categories
+
+| Category | What's Tested |
+|----------|--------------|
+| Functional | Auth, CRUD, forms, navigation, edge cases, integrations |
+| Visual & Responsive | 6 viewport widths, overflow, layout shifts, mobile keyboard |
+| Cross-browser | Chromium, Firefox, WebKit/Safari |
+| Performance | Core Web Vitals, API latency, bundle size, memory, queries |
+| Security | Secrets, auth, XSS, injection, CORS, headers, dependencies |
+| Accessibility | Keyboard, focus, contrast, semantics, screen readers |
+| Reliability | Failure handling, retries, idempotency, data consistency |
+| Usability | First-time UX, error recovery, empty states, confirmations |
+| Code Review | Architecture, error handling, type safety, deployment readiness |
+| Automated | Existing test suite, lint, type check, build, dependency audit |
+
+### Audit Scripts
+
+```bash
+# Scan for hardcoded secrets
+python scripts/audit_secrets.py <directory> --json
+
+# Scan for TODO/FIXME/HACK tags
+python scripts/audit_todos.py <directory> --json --severity
+```
+
+### Severity Definitions
+
+See [references/severity-and-release-gates.md](references/severity-and-release-gates.md)
+
+| Level | Meaning |
+|-------|---------|
+| Blocker | Prevents launch or makes product unusable |
+| Critical | Major security, privacy, financial, or data-integrity risk |
+| High | Seriously affects important feature, limited workaround exists |
+| Medium | Affects secondary journey or subset of users |
+| Low | Minor visual or polish issue |
+
+### Report Output
+
+See [references/report-template.md](references/report-template.md)
+
+Produces: executive summary, verdict, performance budget vs measured, findings by severity, security/accessibility/cross-browser results, areas not tested, recommended actions, release checklist.
+
+### Reference Documents
+
+- [references/test-checklists.md](references/test-checklists.md) — 200+ checklist items
+- [references/performance-methodology.md](references/performance-methodology.md) — metrics, targets, root cause analysis
+- [references/severity-and-release-gates.md](references/severity-and-release-gates.md) — GO/NO-GO criteria
+- [references/report-template.md](references/report-template.md) — structured report template
