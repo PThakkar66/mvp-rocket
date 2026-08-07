@@ -374,14 +374,14 @@ def main() -> int:
                 raw = f.read()
         except (FileNotFoundError, PermissionError) as e:
             if not args.quiet:
-                print(f"error: could not read file '{args.input}' ({e})", file=sys.stderr)
+                print(f"error: could not read file '{args.input}'", file=sys.stderr)
             return 1
 
     try:
         data, applied = repair(raw)
     except json.JSONDecodeError as exc:
         if not args.quiet:
-            print(f"error: could not recover JSON ({exc}).", file=sys.stderr)
+            print(f"error: input is not recoverable JSON.", file=sys.stderr)
         return 1
         
     if args.check:
@@ -401,9 +401,9 @@ def main() -> int:
     if args.output:
         try:
             out_file = open(args.output, "w", encoding="utf-8")
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             if not args.quiet:
-                print(f"error: could not open output file ({e})", file=sys.stderr)
+                print(f"error: could not open output file.", file=sys.stderr)
             return 1
 
     try:

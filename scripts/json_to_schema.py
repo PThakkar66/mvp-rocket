@@ -559,8 +559,8 @@ def main() -> int:
         try:
             raw = sys.stdin.read() if inp == "-" else open(inp, encoding="utf-8").read()
             data = json.loads(raw)
-        except Exception as exc:
-            print(f"error: failed to read or parse input from '{inp}' ({exc}).", file=sys.stderr)
+        except (FileNotFoundError, PermissionError, json.JSONDecodeError) as exc:
+            print(f"error: failed to read or parse '{inp}'.", file=sys.stderr)
             print("hint: ensure file exists and contains valid JSON.", file=sys.stderr)
             return 1
 
@@ -596,8 +596,8 @@ def main() -> int:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
                 f.write(out)
-        except Exception as exc:
-            print(f"error: failed to write to '{args.output}' ({exc}).", file=sys.stderr)
+        except (OSError, PermissionError) as exc:
+            print(f"error: failed to write to '{args.output}'.", file=sys.stderr)
             return 1
     else:
         sys.stdout.write(out)
