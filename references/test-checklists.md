@@ -264,3 +264,115 @@ Perform a safe review without destructive exploitation.
 - [ ] Alerting configured
 - [ ] Backup and restoration plan exists
 - [ ] Deployment rollback procedure documented
+
+## Load, Spike, and Endurance Testing Checklist
+
+Only run load tests against an authorized local, test, or staging environment.
+
+### Before Running
+
+Establish:
+- [ ] Expected concurrent users
+- [ ] Expected request rate
+- [ ] Expected daily or peak traffic
+- [ ] Maximum safe test intensity
+- [ ] Test duration
+- [ ] Protected endpoints (do not load test)
+- [ ] Stop conditions
+
+### When Authorized, Test
+
+- [ ] Expected load
+- [ ] Short traffic spikes
+- [ ] Sustained load
+- [ ] Graceful degradation
+- [ ] Recovery after load
+- [ ] Rate limiting behavior
+- [ ] Queue growth
+- [ ] Connection exhaustion
+- [ ] Database contention
+- [ ] Timeout behavior under load
+- [ ] Retry behavior under load
+- [ ] Duplicate processing under load
+- [ ] Resource leakage (connections, memory, file handles)
+
+Immediately stop the test if it risks damaging data, creating unexpected costs, or affecting real users.
+
+## Usability Review Checklist
+
+Separate objective defects from subjective product suggestions.
+
+- [ ] A first-time user understands the product purpose
+- [ ] The primary action is obvious on each page
+- [ ] Terminology is consistent throughout
+- [ ] Destructive actions require confirmation
+- [ ] Users can recover from mistakes (undo, edit, go back)
+- [ ] Progress and loading indicators are visible during async operations
+- [ ] Error messages explain what happened and what to do next
+- [ ] Empty states guide the user toward the next action
+- [ ] The product prevents duplicate submissions
+- [ ] Forms preserve user input after recoverable errors
+- [ ] Users receive confirmation after important actions (save, delete, submit, purchase)
+- [ ] Navigation and calls to action are consistent across pages
+- [ ] The information hierarchy is clear and scannable
+- [ ] No dead-end pages without navigation options
+
+## Code and Architecture Review Checklist
+
+When source code is available, inspect applicable items. Do not equate a lint warning with a user-facing defect. Classify findings by actual risk.
+
+### Structure and Logic
+- [ ] Application structure is organized and navigable
+- [ ] Critical business logic is correct
+- [ ] Error handling covers expected failure modes
+- [ ] Validation runs on both client and server boundaries
+- [ ] Dead code on critical paths is removed
+
+### Security and Auth
+- [ ] Authentication implementation is sound
+- [ ] Authorization checks are present on all protected routes/endpoints
+- [ ] Database access uses parameterized queries
+
+### Data and State
+- [ ] Transaction handling maintains consistency
+- [ ] Async and concurrency behavior is correct
+- [ ] Retry and timeout configuration is appropriate
+- [ ] Caching strategy is sound
+- [ ] Resource cleanup occurs (connections, streams, handles)
+- [ ] Database migrations are reversible
+- [ ] Rollback readiness is confirmed
+
+### Quality
+- [ ] Logging is structured and useful (not excessive)
+- [ ] Environment configuration uses env vars (no hardcoded secrets)
+- [ ] Feature flags are clean (no stale flags)
+- [ ] Test coverage exists around critical behavior
+- [ ] Type safety is maintained (no unsafe casts on critical paths)
+- [ ] Dependency health: no abandoned, vulnerable, or unnecessary packages
+- [ ] Build produces no warnings
+- [ ] Runtime produces no warnings or deprecation notices
+- [ ] Deployment configuration is complete and correct
+
+## Automated Checks Checklist
+
+Detect and use the repository's existing commands before inventing new ones. Do not silently change lockfiles, upgrade dependencies, or install global software.
+
+- [ ] Dependency installation completes without errors
+- [ ] Type checking passes (tsc, mypy, pyright, etc.)
+- [ ] Linting passes (eslint, ruff, golint, etc.)
+- [ ] Formatting validation passes (prettier, black, gofmt, etc.)
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] End-to-end tests pass
+- [ ] Development build succeeds
+- [ ] Production build succeeds
+- [ ] Static analysis passes (sonarqube, semgrep, bandit, etc.)
+- [ ] Dependency audit shows no critical vulnerabilities (npm audit, pip-audit, etc.)
+- [ ] Accessibility automation passes (axe, lighthouse, etc.)
+- [ ] Browser automation tests pass (playwright, cypress, etc.)
+- [ ] API contract tests pass (when present)
+- [ ] Performance tests pass (when present)
+- [ ] Bundle analysis shows no unexpected growth
+
+Explain what additional tooling is required when it is unavailable.
+
