@@ -37,6 +37,7 @@ import json
 import keyword
 import re
 import sys
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
@@ -77,7 +78,7 @@ def detect_format(s: str, enabled: bool) -> str | None:
 def infer(value: Any, config: Config, depth: int = 0) -> dict:
     if depth > 50:
         if depth == 51:
-            print("warning: recursion depth exceeded 50 during inference", file=sys.stderr)
+            warnings.warn("recursion depth exceeded 50 during inference", stacklevel=2)
         return {"kind": "unknown"}
 
     if value is None:
@@ -557,9 +558,13 @@ def main() -> int:
 
     for inp in args.inputs:
         try:
-            raw = sys.stdin.read() if inp == "-" else open(inp, encoding="utf-8").read()
+            if inp == "-":
+                raw = sys.stdin.read()
+            else:
+                with open(inp, encoding="utf-8") as f:
+                    raw = f.read()
             data = json.loads(raw)
-        except (FileNotFoundError, PermissionError, json.JSONDecodeError) as exc:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             print(f"error: failed to read or parse '{inp}'.", file=sys.stderr)
             print("hint: ensure file exists and contains valid JSON.", file=sys.stderr)
             return 1
@@ -596,7 +601,7 @@ def main() -> int:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
                 f.write(out)
-        except (OSError, PermissionError) as exc:
+        except OSError as exc:
             print(f"error: failed to write to '{args.output}'.", file=sys.stderr)
             return 1
     else:
@@ -606,4 +611,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (BrokenPipeError, KeyboardInterrupt):
+        sys.exit(130)

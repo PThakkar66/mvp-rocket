@@ -367,14 +367,22 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.input == "-":
+        if args.in_place:
+            if not args.quiet:
+                print("error: --in-place cannot be used with stdin.", file=sys.stderr)
+            return 1
         raw = sys.stdin.read()
     else:
         try:
             with open(args.input, encoding=args.encoding) as f:
                 raw = f.read()
-        except (FileNotFoundError, PermissionError) as e:
+        except OSError as e:
             if not args.quiet:
                 print(f"error: could not read file '{args.input}'", file=sys.stderr)
+            return 1
+        except (UnicodeDecodeError, LookupError) as e:
+            if not args.quiet:
+                print(f"error: could not decode file '{args.input}'", file=sys.stderr)
             return 1
 
     try:
@@ -401,7 +409,7 @@ def main() -> int:
     if args.output:
         try:
             out_file = open(args.output, "w", encoding="utf-8")
-        except (OSError, PermissionError) as e:
+        except OSError as e:
             if not args.quiet:
                 print(f"error: could not open output file.", file=sys.stderr)
             return 1
